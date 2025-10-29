@@ -14,7 +14,202 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      blood_inventory: {
+        Row: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          id: string
+          last_updated: string | null
+          units_available: number | null
+        }
+        Insert: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          id?: string
+          last_updated?: string | null
+          units_available?: number | null
+        }
+        Update: {
+          blood_group?: Database["public"]["Enums"]["blood_group_type"]
+          id?: string
+          last_updated?: string | null
+          units_available?: number | null
+        }
+        Relationships: []
+      }
+      blood_requests: {
+        Row: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          contact: string
+          hospital_name: string
+          id: string
+          processed_at: string | null
+          requested_at: string | null
+          status: string | null
+          units_requested: number
+          urgency: string | null
+        }
+        Insert: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          contact: string
+          hospital_name: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string | null
+          status?: string | null
+          units_requested: number
+          urgency?: string | null
+        }
+        Update: {
+          blood_group?: Database["public"]["Enums"]["blood_group_type"]
+          contact?: string
+          hospital_name?: string
+          id?: string
+          processed_at?: string | null
+          requested_at?: string | null
+          status?: string | null
+          units_requested?: number
+          urgency?: string | null
+        }
+        Relationships: []
+      }
+      donations: {
+        Row: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          created_at: string | null
+          donation_date: string | null
+          donor_id: string
+          id: string
+          notes: string | null
+          quantity_ml: number
+          status: string | null
+        }
+        Insert: {
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          created_at?: string | null
+          donation_date?: string | null
+          donor_id: string
+          id?: string
+          notes?: string | null
+          quantity_ml?: number
+          status?: string | null
+        }
+        Update: {
+          blood_group?: Database["public"]["Enums"]["blood_group_type"]
+          created_at?: string | null
+          donation_date?: string | null
+          donor_id?: string
+          id?: string
+          notes?: string | null
+          quantity_ml?: number
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "donations_donor_id_fkey"
+            columns: ["donor_id"]
+            isOneToOne: false
+            referencedRelation: "donors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      donors: {
+        Row: {
+          address: string | null
+          age: number
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          contact: string
+          created_at: string | null
+          email: string | null
+          gender: Database["public"]["Enums"]["gender_type"]
+          id: string
+          last_donation_date: string | null
+          name: string
+          status: Database["public"]["Enums"]["donor_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          age: number
+          blood_group: Database["public"]["Enums"]["blood_group_type"]
+          contact: string
+          created_at?: string | null
+          email?: string | null
+          gender: Database["public"]["Enums"]["gender_type"]
+          id?: string
+          last_donation_date?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["donor_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          age?: number
+          blood_group?: Database["public"]["Enums"]["blood_group_type"]
+          contact?: string
+          created_at?: string | null
+          email?: string | null
+          gender?: Database["public"]["Enums"]["gender_type"]
+          id?: string
+          last_donation_date?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["donor_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      screening_records: {
+        Row: {
+          blood_pressure: string | null
+          donor_id: string
+          hemoglobin: number | null
+          id: string
+          notes: string | null
+          pulse: number | null
+          screened_at: string | null
+          screened_by: string | null
+          screening_result: string | null
+          temperature: number | null
+          weight: number | null
+        }
+        Insert: {
+          blood_pressure?: string | null
+          donor_id: string
+          hemoglobin?: number | null
+          id?: string
+          notes?: string | null
+          pulse?: number | null
+          screened_at?: string | null
+          screened_by?: string | null
+          screening_result?: string | null
+          temperature?: number | null
+          weight?: number | null
+        }
+        Update: {
+          blood_pressure?: string | null
+          donor_id?: string
+          hemoglobin?: number | null
+          id?: string
+          notes?: string | null
+          pulse?: number | null
+          screened_at?: string | null
+          screened_by?: string | null
+          screening_result?: string | null
+          temperature?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "screening_records_donor_id_fkey"
+            columns: ["donor_id"]
+            isOneToOne: false
+            referencedRelation: "donors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +218,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      blood_group_type: "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-"
+      donor_status:
+        | "Eligible"
+        | "In Screening Queue"
+        | "Not Eligible"
+        | "Permanently Defer"
+        | "Ready for Collection"
+        | "Donation Failed"
+        | "Donation Success"
+      gender_type: "M" | "F" | "O"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +354,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      blood_group_type: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+      donor_status: [
+        "Eligible",
+        "In Screening Queue",
+        "Not Eligible",
+        "Permanently Defer",
+        "Ready for Collection",
+        "Donation Failed",
+        "Donation Success",
+      ],
+      gender_type: ["M", "F", "O"],
+    },
   },
 } as const
