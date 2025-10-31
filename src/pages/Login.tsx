@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import { Shield, Building2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Login = () => {
   const navigate = useNavigate();
   const [adminCredentials, setAdminCredentials] = useState({ username: "", password: "" });
   const [hospitalCredentials, setHospitalCredentials] = useState({ username: "", password: "" });
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if user is already logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate("/dashboard");
+      }
+    });
+  }, [navigate]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!adminCredentials.username || !adminCredentials.password) {
@@ -22,16 +32,22 @@ const Login = () => {
       return;
     }
 
-    // Demo credentials
-    if (adminCredentials.username === "admin" && adminCredentials.password === "admin123") {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: adminCredentials.username,
+        password: adminCredentials.password,
+      });
+
+      if (error) throw error;
+
       toast.success("Welcome back, Administrator!");
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } else {
-      toast.error("Invalid credentials");
+      navigate("/dashboard");
+    } catch (error: any) {
+      toast.error(error.message || "Invalid credentials");
     }
   };
 
-  const handleHospitalLogin = (e: React.FormEvent) => {
+  const handleHospitalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!hospitalCredentials.username || !hospitalCredentials.password) {
@@ -39,12 +55,18 @@ const Login = () => {
       return;
     }
 
-    // Demo credentials
-    if (hospitalCredentials.username === "hospital" && hospitalCredentials.password === "hosp123") {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: hospitalCredentials.username,
+        password: hospitalCredentials.password,
+      });
+
+      if (error) throw error;
+
       toast.success("Welcome back, Hospital Staff!");
-      setTimeout(() => navigate("/request"), 1000);
-    } else {
-      toast.error("Invalid credentials");
+      navigate("/request");
+    } catch (error: any) {
+      toast.error(error.message || "Invalid credentials");
     }
   };
 
@@ -77,10 +99,11 @@ const Login = () => {
                 <TabsContent value="admin" className="space-y-4">
                   <form onSubmit={handleAdminLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="admin-username">Username</Label>
+                      <Label htmlFor="admin-username">Email</Label>
                       <Input
                         id="admin-username"
-                        placeholder="Enter admin username"
+                        type="email"
+                        placeholder="Enter admin email"
                         value={adminCredentials.username}
                         onChange={(e) => setAdminCredentials(prev => ({ ...prev, username: e.target.value }))}
                       />
@@ -99,7 +122,7 @@ const Login = () => {
                       Login as Admin
                     </Button>
                     <p className="text-xs text-center text-muted-foreground">
-                      Demo: admin / admin123
+                      Register first at /register page
                     </p>
                   </form>
                 </TabsContent>
@@ -107,10 +130,11 @@ const Login = () => {
                 <TabsContent value="hospital" className="space-y-4">
                   <form onSubmit={handleHospitalLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="hospital-username">Hospital ID</Label>
+                      <Label htmlFor="hospital-username">Email</Label>
                       <Input
                         id="hospital-username"
-                        placeholder="Enter hospital ID"
+                        type="email"
+                        placeholder="Enter hospital email"
                         value={hospitalCredentials.username}
                         onChange={(e) => setHospitalCredentials(prev => ({ ...prev, username: e.target.value }))}
                       />
@@ -129,7 +153,7 @@ const Login = () => {
                       Login as Hospital
                     </Button>
                     <p className="text-xs text-center text-muted-foreground">
-                      Demo: hospital / hosp123
+                      Register first at /register page
                     </p>
                   </form>
                 </TabsContent>

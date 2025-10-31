@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import { Droplet } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -21,11 +22,11 @@ const Register = () => {
     address: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validation
-    if (!formData.name || !formData.age || !formData.gender || !formData.bloodGroup || !formData.contact) {
+    if (!formData.name || !formData.age || !formData.gender || !formData.bloodGroup || !formData.contact || !formData.email) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -35,9 +36,38 @@ const Register = () => {
       return;
     }
 
-    // Simulate registration
-    toast.success("Registration successful! Welcome to BloodBank+");
-    setTimeout(() => navigate("/dashboard"), 1500);
+    try {
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.contact.slice(-6) + "Pass@123", // Simple default password
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Create donor record
+      const { error: donorError } = await supabase.from("donors").insert({
+        user_id: authData.user?.id,
+        name: formData.name,
+        age: parseInt(formData.age),
+        gender: formData.gender as any,
+        blood_group: formData.bloodGroup as any,
+        contact: formData.contact,
+        email: formData.email,
+        address: formData.address,
+        status: "Eligible"
+      });
+
+      if (donorError) throw donorError;
+
+      toast.success("Registration successful! Redirecting to login...");
+      setTimeout(() => navigate("/login"), 1500);
+    } catch (error: any) {
+      toast.error(error.message || "Registration failed");
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -137,13 +167,14 @@ const Register = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Email Address *</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="john.doe@example.com"
                     value={formData.email}
                     onChange={(e) => handleChange("email", e.target.value)}
+                    required
                   />
                 </div>
 

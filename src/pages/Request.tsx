@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import Navbar from "@/components/Navbar";
 import { toast } from "sonner";
 import { Building2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const Request = () => {
   const [formData, setFormData] = useState({
@@ -17,11 +18,11 @@ const Request = () => {
     email: "",
     bloodGroup: "",
     units: "",
-    urgency: "",
+    urgency: "Normal",
     reason: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.hospitalName || !formData.contactPerson || !formData.phone || !formData.bloodGroup || !formData.units) {
@@ -34,17 +35,32 @@ const Request = () => {
       return;
     }
 
-    toast.success("Blood request submitted successfully! Our team will contact you shortly.");
-    setFormData({
-      hospitalName: "",
-      contactPerson: "",
-      phone: "",
-      email: "",
-      bloodGroup: "",
-      units: "",
-      urgency: "",
-      reason: "",
-    });
+    try {
+      const { error } = await supabase.from("blood_requests").insert({
+        hospital_name: formData.hospitalName,
+        blood_group: formData.bloodGroup as any,
+        units_requested: parseInt(formData.units),
+        urgency: formData.urgency,
+        contact: formData.phone,
+        status: "Pending"
+      });
+
+      if (error) throw error;
+
+      toast.success("Blood request submitted successfully! Our team will contact you shortly.");
+      setFormData({
+        hospitalName: "",
+        contactPerson: "",
+        phone: "",
+        email: "",
+        bloodGroup: "",
+        units: "",
+        urgency: "Normal",
+        reason: "",
+      });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit request");
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -160,9 +176,9 @@ const Request = () => {
                       <SelectValue placeholder="Select urgency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="emergency">Emergency (Within 2 hours)</SelectItem>
-                      <SelectItem value="urgent">Urgent (Within 24 hours)</SelectItem>
-                      <SelectItem value="normal">Normal (Within 3-5 days)</SelectItem>
+                      <SelectItem value="Emergency">Emergency (Within 2 hours)</SelectItem>
+                      <SelectItem value="Urgent">Urgent (Within 24 hours)</SelectItem>
+                      <SelectItem value="Normal">Normal (Within 3-5 days)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

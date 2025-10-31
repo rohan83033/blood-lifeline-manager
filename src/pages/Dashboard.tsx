@@ -1,25 +1,92 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Navbar from "@/components/Navbar";
-import { Search, Filter, Users, Droplet, TrendingUp, Calendar } from "lucide-react";
+import { Search, Filter, Users, Droplet, TrendingUp, Calendar, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { DonorCheckIn } from "@/components/DonorCheckIn";
+import { ScreeningDialog } from "@/components/ScreeningDialog";
+import { CollectBloodDialog } from "@/components/CollectBloodDialog";
+import { DonorDetailsDialog } from "@/components/DonorDetailsDialog";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [donors, setDonors] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    totalDonors: 0,
+    unitsAvailable: 0,
+    monthlyDonations: 0,
+    pendingRequests: 0,
+  });
+  
+  const [checkInDialog, setCheckInDialog] = useState<{ open: boolean; donorId: string; donorName: string }>({ 
+    open: false, donorId: "", donorName: "" 
+  });
+  const [screeningDialog, setScreeningDialog] = useState<{ open: boolean; donorId: string; donorName: string }>({ 
+    open: false, donorId: "", donorName: "" 
+  });
+  const [collectDialog, setCollectDialog] = useState<{ 
+    open: boolean; donorId: string; donorName: string; bloodGroup: string 
+  }>({ 
+    open: false, donorId: "", donorName: "", bloodGroup: "" 
+  });
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; donorId: string }>({ 
+    open: false, donorId: "" 
+  });
 
-  const donors = [
-    { id: "SB821-00046", name: "Jane Doe", status: "Eligible", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "John Doe", status: "In Screening Queue", gender: "F", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Alex Doe", status: "Not Eligible", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Jane Smith", status: "Permanently Defer", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Alexander", status: "Ready for Collection", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Jubin Dew", status: "Donation Failed", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Martin", status: "Donation Success", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-    { id: "SB821-00046", name: "Alex Smith", status: "In Screening Queue", gender: "M", bloodGroup: "B Rh Positive", lastChecking: "05 Sept, 2022 at 12:36 PM" },
-  ];
+  useEffect(() => {
+    checkAuth();
+    loadDonors();
+    loadStats();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/login");
+    }
+  };
+
+  const loadDonors = async () => {
+    const { data, error } = await supabase
+      .from("donors")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (data) setDonors(data);
+  };
+
+  const loadStats = async () => {
+    const { data: donorsData } = await supabase.from("donors").select("id", { count: "exact" });
+    const { data: inventoryData } = await supabase.from("blood_inventory").select("units_available");
+    const { data: donationsData } = await supabase
+      .from("donations")
+      .select("id")
+      .gte("donation_date", new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+    const { data: requestsData } = await supabase
+      .from("blood_requests")
+      .select("id", { count: "exact" })
+      .eq("status", "Pending");
+
+    setStats({
+      totalDonors: donorsData?.length || 0,
+      unitsAvailable: inventoryData?.reduce((sum, item) => sum + item.units_available, 0) || 0,
+      monthlyDonations: donationsData?.length || 0,
+      pendingRequests: requestsData?.length || 0,
+    });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Logged out successfully");
+    navigate("/login");
+  };
 
   const getStatusVariant = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -34,17 +101,41 @@ const Dashboard = () => {
     return variants[status] || "default";
   };
 
-  const getActionButton = (status: string) => {
-    if (status === "Eligible") return <Button size="sm">Check-In</Button>;
-    if (status === "In Screening Queue") return <Button size="sm" variant="secondary">Start Screening</Button>;
-    if (status === "Ready for Collection") return <Button size="sm" className="bg-accent hover:bg-accent/90">Collect Blood</Button>;
-    if (status === "Donation Success" || status === "Donation Failed") return <Button size="sm" variant="outline">View Details</Button>;
-    return <Button size="sm" variant="outline">Check-In</Button>;
+  const getActionButton = (donor: any) => {
+    if (donor.status === "Eligible") {
+      return <Button size="sm" onClick={() => setCheckInDialog({ open: true, donorId: donor.id, donorName: donor.name })}>Check-In</Button>;
+    }
+    if (donor.status === "In Screening Queue") {
+      return <Button size="sm" variant="secondary" onClick={() => setScreeningDialog({ open: true, donorId: donor.id, donorName: donor.name })}>Start Screening</Button>;
+    }
+    if (donor.status === "Ready for Collection") {
+      return <Button size="sm" className="bg-accent hover:bg-accent/90" onClick={() => setCollectDialog({ open: true, donorId: donor.id, donorName: donor.name, bloodGroup: donor.blood_group })}>Collect Blood</Button>;
+    }
+    if (donor.status === "Donation Success" || donor.status === "Donation Failed") {
+      return <Button size="sm" variant="outline" onClick={() => setDetailsDialog({ open: true, donorId: donor.id })}>View Details</Button>;
+    }
+    return <Button size="sm" variant="outline" onClick={() => setDetailsDialog({ open: true, donorId: donor.id })}>View Details</Button>;
   };
+
+  const filteredDonors = donors.filter(donor => 
+    donor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    donor.contact.includes(searchQuery) ||
+    donor.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      
+      {/* Logout Button */}
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
+      </div>
       
       <div className="container mx-auto px-4 py-8">
         {/* Stats Grid */}
@@ -55,8 +146,8 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">5,420</div>
-              <p className="text-xs text-muted-foreground">+12% from last month</p>
+              <div className="text-2xl font-bold">{stats.totalDonors}</div>
+              <p className="text-xs text-muted-foreground">Registered donors</p>
             </CardContent>
           </Card>
 
@@ -66,7 +157,7 @@ const Dashboard = () => {
               <Droplet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3,240</div>
+              <div className="text-2xl font-bold">{stats.unitsAvailable}</div>
               <p className="text-xs text-muted-foreground">All blood types</p>
             </CardContent>
           </Card>
@@ -77,7 +168,7 @@ const Dashboard = () => {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">892</div>
+              <div className="text-2xl font-bold">{stats.monthlyDonations}</div>
               <p className="text-xs text-muted-foreground">Successful donations</p>
             </CardContent>
           </Card>
@@ -88,7 +179,7 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">{stats.pendingRequests}</div>
               <p className="text-xs text-muted-foreground">Awaiting approval</p>
             </CardContent>
           </Card>
@@ -130,12 +221,12 @@ const Dashboard = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {donors.map((donor, index) => (
-                    <TableRow key={index}>
+                  {filteredDonors.map((donor) => (
+                    <TableRow key={donor.id}>
                       <TableCell>
                         <div>
                           <div className="font-medium">{donor.name}</div>
-                          <div className="text-sm text-muted-foreground">{donor.id}</div>
+                          <div className="text-sm text-muted-foreground">{donor.email}</div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -144,10 +235,14 @@ const Dashboard = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>{donor.gender}</TableCell>
-                      <TableCell>{donor.bloodGroup}</TableCell>
-                      <TableCell className="text-sm">{donor.lastChecking}</TableCell>
+                      <TableCell>{donor.blood_group}</TableCell>
+                      <TableCell className="text-sm">
+                        {donor.last_donation_date 
+                          ? new Date(donor.last_donation_date).toLocaleDateString()
+                          : "Never"}
+                      </TableCell>
                       <TableCell>
-                        {getActionButton(donor.status)}
+                        {getActionButton(donor)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -157,6 +252,38 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialogs */}
+      <DonorCheckIn
+        donorId={checkInDialog.donorId}
+        donorName={checkInDialog.donorName}
+        open={checkInDialog.open}
+        onClose={() => setCheckInDialog({ open: false, donorId: "", donorName: "" })}
+        onSuccess={() => { loadDonors(); loadStats(); }}
+      />
+      
+      <ScreeningDialog
+        donorId={screeningDialog.donorId}
+        donorName={screeningDialog.donorName}
+        open={screeningDialog.open}
+        onClose={() => setScreeningDialog({ open: false, donorId: "", donorName: "" })}
+        onSuccess={() => { loadDonors(); loadStats(); }}
+      />
+      
+      <CollectBloodDialog
+        donorId={collectDialog.donorId}
+        donorName={collectDialog.donorName}
+        bloodGroup={collectDialog.bloodGroup}
+        open={collectDialog.open}
+        onClose={() => setCollectDialog({ open: false, donorId: "", donorName: "", bloodGroup: "" })}
+        onSuccess={() => { loadDonors(); loadStats(); }}
+      />
+      
+      <DonorDetailsDialog
+        donorId={detailsDialog.donorId}
+        open={detailsDialog.open}
+        onClose={() => setDetailsDialog({ open: false, donorId: "" })}
+      />
     </div>
   );
 };
